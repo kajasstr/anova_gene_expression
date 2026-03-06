@@ -1,0 +1,119 @@
+---
+title: 'Semestrální práce'
+author: "Karolína Šustrová, Kruh 446"
+email: "sustrovk@vscht.cz"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Načtení potřebných knihoven
+library(ggplot2)
+```
+
+## 1. Rekapitulace zadání
+Cílem této analýzy je porovnat míru exprese genu PPP6R3 v pěti různých tkáňových kulturách (akutní lymfoblastická leukémie - ALL, promyelocytická leukémie - PML, myelom - MYE, lymfom - LYM, chronická myeloidní leukémie - CML).
+Data představují logaritmus signálu z DNA čipu, jehož hodnota je úměrná logaritmu koncentrace mRNA.
+
+## 2. Formulace hypotéz
+Pro statistické ověření rozdílů použijeme analýzu rozptylu (ANOVA).
+
+* **Nulová hypotéza ($H_0$):** Střední hodnoty exprese genu jsou ve všech pěti tkáňových kulturách (skupinách) shodné:
+$$\mu_{ALL} = \mu_{PML} = \mu_{MYE} = \mu_{LYM} = \mu_{CML}$$
+* **Alternativní hypotéza ($H_1$):** Alespoň jedna dvojice tkáňových kultur (skupin) se ve střední hodnotě liší (ne všechny průměry jsou stejné).
+
+Hladinu významnosti stanovujeme na $\alpha = 0.05$.
+
+## 3. Příprava dat
+Data ze zadání převedeme do formátu "long" pro analýzu v R (jeden sloupec pro skupiny tkání, jeden pro hodnoty exprese).
+
+```{r data}
+# Vytvoření vektoru hodnot
+hodnoty <- c(9.49401, 9.41961, 9.61037,  # ALL
+             9.06951, 8.86489, 9.29840,  # PML
+             8.74419, 8.76003, 9.23804,  # MYE
+             8.72770, 8.90253, 9.17150,  # LYM
+             8.71512, 8.91498, 8.90757)  # CML
+
+# Vytvoření vektoru skupin
+skupiny <- factor(rep(c("ALL", "PML", "MYE", "LYM", "CML"), each = 3))
+
+# Vytvoření dataframu
+df <- data.frame(Skupina = skupiny, Exprese = hodnoty)
+
+# Kontrola dat
+head(df)
+summary(df)
+```
+
+## 4. Vizualizace dat
+Před provedením analýzy pomocí ANOVA je vhodné vizualizovat rozdělení dat pomocí boxplotu. Vzhledem k malému počtu pozorování ($n=3$ pro každou skupinu) přidáme i body jednotlivých měření.
+
+```{r graf, fig.align='center'}
+ggplot(df, aes(x = Skupina, y = Exprese, fill = Skupina)) +
+  geom_boxplot(alpha = 0.3) +
+  geom_jitter(width = 0.1, size = 2) +
+  labs(title = "Exprese genu PPP6R3 v různých tkáňových kulturách",
+       x = "Tkáňová kultura",
+       y = "Logaritmus exprese") +
+  theme_minimal()
+```
+*Z grafu je patrné, že skupina ALL má vyšší hodnoty exprese než ostatní skupiny. Naopak MYE a CML se zdají být nižší.*
+
+
+## 5. Ověření předpokladů ANOVA
+Pro použití ANOVA je třeba ověřit její předpoklady:
+
+1. **Nezávislost pozorování:** Zaručena designem studie (různé tkáňové kultury).
+
+2. **Normalita dat (residuí):** Ověříme pomocí Shapiro-Wilkova testu na residuích modelu.
+
+3. **Homogenita rozptylů (shoda rozptylů):** Ověříme pomocí Bartlettova testu (vhodný pro normální data).
+
+```{r predpoklady}
+# Vytvoření lineárního modelu pro ANOVA
+model <- aov(Exprese ~ Skupina, data = df)
+
+# 1. Test normality residuí (Shapiro-Wilk)
+shapiro <- shapiro.test(residuals(model))
+print(shapiro)
+
+# 2. Test homogenity rozptylů (Bartlett)
+bartlett <- bartlett.test(Exprese ~ Skupina, data = df)
+print(bartlett)
+```
+
+**Interpretace ověření předpokladů:**
+
+* **Normalita:** $p\text{-hodnota}$ Shapiro-Wilkova testu je `r round(shapiro$p.value, 3)`. Hodnota je větší než $0.05$, proto nezamítáme nulovou hypotézu o normalitě. Předpoklad normality je splněn.
+
+* **Homogenita:** $p\text{-hodnota}$ Bartlettova testu je `r round(bartlett$p.value, 3)`. Hodnota je větší než $0.05$, proto nezamítáme nulovou hypotézu o shodě rozptylů. Předpoklad homogenity je splněn.
+
+## 6. Provedení ANOVA
+Nyní můžeme provést parametrickou jednofaktorovou analýzu rozptylu (One-way ANOVA) pro testování našich hypotéz.
+
+```{r anova}
+summary(model)
+```
+
+## 7. Post-hoc test
+ANOVA ukázala statisticky významné rozdíly mezi skupinami. Musíme určit, které konkrétní skupiny se liší. K tomu použijeme Tukeyův HSD test.
+
+```{r posthoc}
+TukeyHSD(model)
+plot(TukeyHSD(model))
+```
+
+## 8. Závěr
+Cílem této semestrální práce bylo porovnat míru exprese genu PPP6R3 v pěti různých tkáňových kulturách pomocí analýzy rozptylu (ANOVA).
+
+Z výsledků jsme zjistili, že **existuje statisticky významný rozdíl** v expresi tohoto genu mezi zkoumanými skupinami ($F(4, 10) = 5.382, $p = 0.0142$).
+
+Následná Post-hoc analýza pomocí Tukeyova HSD testu odhalila, že statisticky významný rozdíl (na hladině $p < 0.05$) je konkrétně mezi skupinami:
+
+* **ALL a CML** ($p = 0.015$)
+* **ALL a LYM** ($p = 0.034$)
+* **ALL a MYE** ($p = 0.028$)
+
+Skupina ALL vykazuje vyšší míru exprese genu PPP6R3 než skupiny CML, LYM a MYE. Ostatní rozdíly mezi skupinami nebyly statisticky významné.
